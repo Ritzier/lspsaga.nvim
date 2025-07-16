@@ -13,6 +13,14 @@ local function make_floating_popup_options(opts)
     ['opts.offset_y'] = { opts.offset_y, 'n', true },
   })
 
+  if not opts.width or opts.width <= 0 then
+    opts.width = math.max(1, math.floor(vim.o.columns * 0.8))
+  end
+
+  if not opts.height or opts.height <= 0 then
+    opts.height = math.max(1, math.floor(vim.o.columns * 0.8))
+  end
+
   local anchor = ''
   local row, col
 
@@ -48,6 +56,9 @@ local function make_floating_popup_options(opts)
   if title then
     title_pos = opts.title_pos or 'center'
   end
+
+  opts.width = math.max(1, math.floor(opts.width))
+  opts.height = math.max(1, math.floor(opts.height))
 
   return {
     anchor = anchor,
@@ -151,6 +162,15 @@ function win:new_float(float_opt, enter, force)
 
   self.bufnr = float_opt.bufnr or api.nvim_create_buf(false, false)
   float_opt.bufnr = nil
+
+  if float_opt.width and float_opt.width <= 0 then
+    float_opt.width = math.max(1, math.floor(vim.o.columns * 0.8))
+  end
+
+  if float_opt.height and float_opt.height <= 0 then
+    float_opt.height = math.max(1, math.floor(vim.o.columns * 0.8))
+  end
+
   float_opt = not force and make_floating_popup_options(float_opt)
     or vim.tbl_extend('force', default(), float_opt)
 
