@@ -244,7 +244,7 @@ local function apply_action(action, client, enriched_ctx)
         arguments = command.arguments,
         workDoneToken = command.workDoneToken,
       }
-      client.request('workspace/executeCommand', params, nil, enriched_ctx.bufnr)
+      client:request('workspace/executeCommand', params, nil, enriched_ctx.bufnr)
     end
   end
   clean_ctx()
@@ -254,7 +254,7 @@ function act:support_resolve(client)
   if vim.version().minor >= 10 then
     local reg = client.dynamic_capabilities:get('textDocument/codeAction', { bufnr = ctx.bufnr })
     return vim.tbl_get(reg or {}, 'registerOptions', 'resolveProvider')
-      or client.supports_method('codeAction/resolve')
+      or client:supports_method('codeAction/resolve')
   end
   return vim.tbl_get(client.server_capabilities, 'codeActionProvider', 'resolveProvider')
 end
@@ -263,7 +263,7 @@ function act:get_resolve_action(client, action, bufnr)
   if not self:support_resolve(client) then
     return
   end
-  return client.request_sync('codeAction/resolve', action, 1500, bufnr).result
+  return client:request_sync('codeAction/resolve', action, 1500, bufnr).result
 end
 
 function act:do_code_action(action, client, enriched_ctx)
