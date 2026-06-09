@@ -6,11 +6,32 @@ local M = {}
 M.iswin = uv.os_uname().sysname:match('Windows')
 M.ismac = uv.os_uname().sysname == 'Darwin'
 M.is_ten = vim.version().minor >= 10
+M.is_eleven = vim.version().minor >= 11
 
 M.path_sep = M.iswin and '\\' or '/'
 
 function M.path_join(...)
   return table.concat({ ... }, M.path_sep)
+end
+
+-- 0.11+ warns on dot calls; 0.10- breaks on colon calls.
+local function client_method_wrapper(client, name, ...)
+  if M.is_eleven then
+    return client[name](client, ...)
+  end
+  return client[name](...)
+end
+
+function M.client_request(client, ...)
+  return client_method_wrapper(client, 'request', ...)
+end
+
+function M.client_request_sync(client, ...)
+  return client_method_wrapper(client, 'request_sync', ...)
+end
+
+function M.client_supports_method(client, ...)
+  return client_method_wrapper(client, 'supports_method', ...)
 end
 
 function M.path_itera(buf)
@@ -66,11 +87,39 @@ function M.get_client_by_method(method)
   local supports = {}
 
   for _, client in ipairs(clients or {}) do
-    if client:supports_method(method) then
+    -- if client:supports_method(method) then
+    if M.client_supports_method(client, method) then
       supports[#supports + 1] = client
     end
   end
   return supports
+end
+
+--- generate LSP RPC method `textDocument/references` parameters by configuration.
+---@param method string LSP RPC method name
+---@param params table parameters for LSP RPC method
+---@param config table|boolean configuration for config.finder.ref_opt
+---@return table
+function M.gen_param_by_config(method, params, config)
+  if type(config) == 'table' and method == 'textDocument/references' then
+    local bufnr = vim.api.nvim_get_current_buf()
+    local clients = lsp.get_clients({ bufnr = bufnr })
+
+    for _, client in ipairs(clients or {}) do
+      -- Replace characters dash('-') to underscore('_') for LSP client name,
+      -- which is useful for some LSP client like `rust-analyzer`.
+      local client_name = string.gsub(client.name, '-', '_')
+      local v = vim.tbl_get(config, client_name)
+      if v ~= nil then
+        params.context = {
+          includeDeclaration = v,
+        }
+        return { method, params }
+      end
+    end
+  end
+
+  return { method, params }
 end
 
 function M.feedkeys(key)
@@ -107,9 +156,7 @@ function M.gen_truncate_line(width)
 end
 
 function M.get_max_content_length(contents)
-  vim.validate({
-    contents = { contents, 't' },
-  })
+  vim.validate('contents', contents, 'table')
   local cells = {}
   for _, v in pairs(contents) do
     if v:find('\n.') then
